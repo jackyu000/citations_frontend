@@ -1,36 +1,93 @@
 'use client';
-
 import { useState } from 'react';
 
 export default function Home() {
   const [hypothesis, setHypothesis] = useState('');
   const [subject, setSubject] = useState('Physics');
-  
-  const handleSubmit = async () => {
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [runId, setRunId] = useState<string | null>(null);
+  const [pollingStatus, setPollingStatus] = useState('');
+
+  // Function to poll for run status
+  const pollRunStatus = async (id: string) => {
     try {
-      const response = await fetch('https://webhook.site/your-webhook-url', {
+      setPollingStatus('Checking run status...');
+      const response = await fetch('/api/validate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          hypothesis,
-          subject,
-          timestamp: new Date().toISOString()
-        })
+        body: JSON.stringify({ runId: id }),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error('Failed to check run status');
       }
+
+      const data = await response.json();
+      const runData = data.result;
       
-      // Clear the hypothesis field after successful submission
-      setHypothesis('');
-      alert('Hypothesis submitted successfully!');
+      console.log('Poll response:', runData);
       
-    } catch (error) {
-      console.error('Error submitting hypothesis:', error);
-      alert('Error submitting hypothesis. Please try again.');
+      if (runData.status === 'completed') {
+        setResult(runData);
+        setRunId(null);
+        setLoading(false);
+        setPollingStatus('');
+      } else if (runData.status === 'failed') {
+        throw new Error('Run failed: ' + (runData.error || 'Unknown error'));
+      } else {
+        // Still in progress, poll again after a delay
+        setPollingStatus(`Run in progress (${runData.status})...`);
+        setTimeout(() => pollRunStatus(id), 2000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setRunId(null);
+      setLoading(false);
+      setPollingStatus('');
+    }
+  };
+
+  const handleValidate = async () => {
+    if (!hypothesis.trim()) {
+      setError('Please enter a hypothesis');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setResult(null);
+    setPollingStatus('Starting analysis...');
+
+    try {
+      // Create a new run
+      const response = await fetch('/api/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ hypothesis, subject }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start analysis');
+      }
+
+      const data = await response.json();
+      console.log('Initial run data:', data);
+      
+      const newRunId = data.result.id;
+      setRunId(newRunId);
+      
+      // Start polling for status
+      pollRunStatus(newRunId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setLoading(false);
+      setPollingStatus('');
     }
   };
   return (
@@ -86,12 +143,28 @@ export default function Home() {
                 onChange={(e) => setHypothesis(e.target.value)}
               />
               <button 
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={handleSubmit}
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+                onClick={handleValidate}
+                disabled={loading}
               >
-                Search
+                {loading ? pollingStatus || 'Processing...' : 'Validate'}
               </button>
             </div>
+
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 text-red-700 rounded">
+                {error}
+              </div>
+            )}
+
+            {result && (
+              <div className="mt-4 p-6 bg-gray-50 rounded border">
+                <h3 className="text-lg font-semibold mb-2">Analysis Result:</h3>
+                <div className="whitespace-pre-wrap">
+                  {result.result || result.output?.content || result.output?.[0]?.content || 'No analysis available'}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
