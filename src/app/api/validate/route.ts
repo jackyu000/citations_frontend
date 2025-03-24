@@ -4,7 +4,7 @@ const AI21_API_KEY = process.env.AI21_API_KEY;
 const AI21_API_URL = 'https://api.ai21.com/studio/v1/maestro/runs';
 
 // Function to create a new run
-async function createRun(hypothesis: string, subject: string) {
+async function createRun(hypothesis: string) {
   const response = await fetch(AI21_API_URL, {
     method: 'POST',
     headers: {
@@ -56,7 +56,7 @@ async function checkRunStatus(runId: string) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { hypothesis, subject, runId } = body;
+    const { hypothesis, runId } = body;
 
     // If runId is provided, check status of existing run
     if (runId) {
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     }
     
     // Otherwise create a new run
-    const runData = await createRun(hypothesis, subject);
+    const runData = await createRun(hypothesis);
     console.log("Created new run:", runData);
     
     return NextResponse.json({ result: runData });

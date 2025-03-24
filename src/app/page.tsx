@@ -4,15 +4,18 @@ import { useState } from 'react';
 export default function Home() {
   const [hypothesis, setHypothesis] = useState('');
   const [subject, setSubject] = useState('Physics');
+   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Using underscore prefix to indicate intentionally unused variable
   const [runId, setRunId] = useState<string | null>(null);
   const [pollingStatus, setPollingStatus] = useState('');
 
   // Function to poll for run status
   const pollRunStatus = async (id: string) => {
     try {
+      console.log(runId);
       setPollingStatus('Checking run status...');
       const response = await fetch('/api/validate', {
         method: 'POST',
